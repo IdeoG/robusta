@@ -28,6 +28,14 @@ class SlackSinkParams(SinkBaseParams):
     channel_override: Optional[str] = None
     max_log_file_limit_kb: int = 1000
 
+    @classmethod
+    def _supports_grouping(cls):
+        return True
+
+    @classmethod
+    def _get_sink_name(cls):
+        return "slack"
+
     @validator("channel_override")
     def validate_channel_override(cls, v: str):
         if v:

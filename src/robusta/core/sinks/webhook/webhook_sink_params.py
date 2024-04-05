@@ -10,6 +10,10 @@ class WebhookSinkParams(SinkBaseParams):
     authorization: SecretStr = None
     format: str = "text"
 
+    @classmethod
+    def _get_sink_name(cls):
+        return "webhook"
+
 
 class WebhookSinkConfigWrapper(SinkConfigBase):
     webhook_sink: WebhookSinkParams

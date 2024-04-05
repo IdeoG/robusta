@@ -1,5 +1,6 @@
 import logging
 import re
+from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, root_validator, validator
@@ -55,13 +56,34 @@ class ActivityParams(BaseModel):
         return intervals
 
 
-class SinkBaseParams(BaseModel):
+class RegularNotificationModeParams(BaseModel):
+    ignore_first: Optional[int] = 0
+
+
+class SummaryNotificationModeParams(BaseModel):
+    threaded: Optional[bool] = True
+    by: List[str]
+
+
+class NotificationModeParams(BaseModel):
+    regular: Optional[RegularNotificationModeParams]
+    summary: Optional[SummaryNotificationModeParams]
+
+
+class GroupingParams(BaseModel):
+    group_by: Optional[List[Union[str, Dict[str, List[str]]]]]
+    interval: int
+    notification_mode: Optional[NotificationModeParams]
+
+
+class SinkBaseParams(ABC, BaseModel):
     name: str
     send_svg: bool = False
     default: bool = True
     match: dict = {}
     scope: Optional[ScopeParams]
     activity: Optional[ActivityParams]
+    grouping: Optional[GroupingParams]
     stop: bool = False  # Stop processing if this sink has been matched
 
     @root_validator
@@ -76,6 +98,12 @@ class SinkBaseParams(BaseModel):
             if annotations:
                 match["annotations"] = cls.__parse_dict_matchers(annotations)
         return updated
+
+    @root_validator
+    def validate_grouping(cls, values: Dict):
+        if values.get("grouping") and not cls._supports_grouping():
+            logging.warning(f"Configuration problem: sinks of type {cls._get_sink_name()} do not support grouping")
+        return values
 
     @classmethod
     def __parse_dict_matchers(cls, matchers) -> Union[Dict, List[Dict]]:
@@ -95,3 +123,12 @@ class SinkBaseParams(BaseModel):
                 return {}
             result[kv[0].strip()] = kv[1].strip()
         return result
+
+    @classmethod
+    def _supports_grouping(cls):
+        return False
+
+    @classmethod
+    @abstractmethod
+    def _get_sink_name(cls):
+        raise NotImplementedError

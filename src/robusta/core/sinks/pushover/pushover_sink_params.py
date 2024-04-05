@@ -10,6 +10,11 @@ class PushoverSinkParams(SinkBaseParams):
     device: str = None
     pushover_url: str = "https://api.pushover.net/1/messages.json"
 
+    @classmethod
+    def _get_sink_name(cls):
+        return "pushover"
+
+
 class PushoverSinkConfigWrapper(SinkConfigBase):
     pushover_sink: PushoverSinkParams
 
