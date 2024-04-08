@@ -60,20 +60,32 @@ class RegularNotificationModeParams(BaseModel):
     ignore_first: Optional[int] = 0
 
 
+# a list of attribute names, which can be strings or dicts of the form
+# {"labels": ["app", "label-xyz"]} etc.
+GroupingAttributeSelectorListT = List[Union[str, Dict[str, List[str]]]]
+
+
 class SummaryNotificationModeParams(BaseModel):
     threaded: Optional[bool] = True
-    by: List[str]
+    by: Optional[GroupingAttributeSelectorListT] = ["identifier"]
 
 
 class NotificationModeParams(BaseModel):
     regular: Optional[RegularNotificationModeParams]
     summary: Optional[SummaryNotificationModeParams]
+    # TODO should we enforce that only one of these is set?
 
 
 class GroupingParams(BaseModel):
-    group_by: Optional[List[Union[str, Dict[str, List[str]]]]]
-    interval: int
+    group_by: Optional[GroupingAttributeSelectorListT]
+    interval: int = 300  # in seconds
     notification_mode: Optional[NotificationModeParams]
+
+    @root_validator
+    def validate_notification_mode(cls, values: Dict):
+        if values is None:
+            return {"summary": SummaryNotificationModeParams()}
+        return values
 
 
 class SinkBaseParams(ABC, BaseModel):
@@ -102,7 +114,7 @@ class SinkBaseParams(ABC, BaseModel):
     @root_validator
     def validate_grouping(cls, values: Dict):
         if values.get("grouping") and not cls._supports_grouping():
-            logging.warning(f"Configuration problem: sinks of type {cls._get_sink_name()} do not support grouping")
+            logging.warning(f"Sinks of type {cls._get_sink_name()} do not support notification grouping")
         return values
 
     @classmethod

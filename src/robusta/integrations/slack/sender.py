@@ -234,7 +234,7 @@ class SlackSender:
         unfurl: bool,
         status: FindingStatus,
         channel: str,
-    ):
+    ) -> str:
         file_blocks = add_pngs_for_all_svgs([b for b in report_blocks if isinstance(b, FileBlock)])
         if not sink_params.send_svg:
             file_blocks = [b for b in file_blocks if not b.filename.endswith(".svg")]
@@ -265,7 +265,7 @@ class SlackSender:
         )
 
         try:
-            self.slack_client.chat_postMessage(
+            resp = self.slack_client.chat_postMessage(
                 channel=channel,
                 text=message,
                 blocks=output_blocks,
@@ -276,6 +276,7 @@ class SlackSender:
                 unfurl_links=unfurl,
                 unfurl_media=unfurl,
             )
+            return resp["ts"]
         except Exception as e:
             logging.error(
                 f"error sending message to slack\ne={e}\ntext={message}\nchannel={channel}\nblocks={*output_blocks,}\nattachment_blocks={*attachment_blocks,}"
@@ -328,7 +329,7 @@ class SlackSender:
         finding: Finding,
         sink_params: SlackSinkParams,
         platform_enabled: bool,
-    ):
+    ) -> str:
         blocks: List[BaseBlock] = []
         attachment_blocks: List[BaseBlock] = []
 
@@ -367,7 +368,7 @@ class SlackSender:
         if len(attachment_blocks):
             attachment_blocks.append(DividerBlock())
 
-        self.__send_blocks_to_slack(
+        return self.__send_blocks_to_slack(
             blocks,
             attachment_blocks,
             finding.title,
