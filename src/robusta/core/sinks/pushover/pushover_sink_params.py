@@ -11,7 +11,7 @@ class PushoverSinkParams(SinkBaseParams):
     pushover_url: str = "https://api.pushover.net/1/messages.json"
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "pushover"
 
 

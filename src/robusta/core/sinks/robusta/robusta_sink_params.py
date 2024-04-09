@@ -18,7 +18,7 @@ class RobustaSinkParams(SinkBaseParams):
     persist_events: bool = False
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "robusta"
 
 

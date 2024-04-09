@@ -7,7 +7,7 @@ class WebexSinkParams(SinkBaseParams):
     room_id: str
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "webex"
 
 

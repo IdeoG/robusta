@@ -8,7 +8,7 @@ class MailSinkParams(SinkBaseParams):
     mailto: str
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "mail"
 
     @validator("mailto")

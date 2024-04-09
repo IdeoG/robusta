@@ -8,7 +8,7 @@ class FileSinkParms(SinkBaseParams):
     file_name: str = None
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "file"
 
 

@@ -15,7 +15,7 @@ class YaMessengerSinkParams(SinkBaseParams):
     send_files: bool = True # Send files (logs, images)
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "yamessenger"
 
     @root_validator()

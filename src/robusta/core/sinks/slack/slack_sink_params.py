@@ -33,7 +33,7 @@ class SlackSinkParams(SinkBaseParams):
         return True
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "slack"
 
     @validator("channel_override")

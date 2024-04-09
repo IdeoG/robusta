@@ -11,7 +11,7 @@ class OpsGenieSinkParams(SinkBaseParams):
     host: Optional[str] = None  # NOTE: If None, the default value will be used from opsgenie_sdk
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "opsgenie"
 
 

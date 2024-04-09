@@ -8,7 +8,7 @@ class GoogleChatSinkParams(SinkBaseParams):
     webhook_url: SecretStr
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "google_chat"
 
 

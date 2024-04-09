@@ -114,7 +114,7 @@ class SinkBaseParams(ABC, BaseModel):
     @root_validator
     def validate_grouping(cls, values: Dict):
         if values.get("grouping") and not cls._supports_grouping():
-            logging.warning(f"Sinks of type {cls._get_sink_name()} do not support notification grouping")
+            logging.warning(f"Sinks of type {cls._get_sink_type()} do not support notification grouping")
         return values
 
     @classmethod
@@ -142,5 +142,5 @@ class SinkBaseParams(ABC, BaseModel):
 
     @classmethod
     @abstractmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         raise NotImplementedError

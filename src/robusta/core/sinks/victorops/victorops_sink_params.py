@@ -6,7 +6,7 @@ class VictoropsSinkParams(SinkBaseParams):
     url: str
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "victorops"
 
 

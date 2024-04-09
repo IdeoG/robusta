@@ -13,7 +13,7 @@ class RocketchatSinkParams(SinkBaseParams):
     server_url: str
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "rocketchat"
 
     def get_rocketchat_channel(self) -> str:

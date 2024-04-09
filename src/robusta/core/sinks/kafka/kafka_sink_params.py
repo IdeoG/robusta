@@ -8,7 +8,7 @@ class KafkaSinkParams(SinkBaseParams):
     auth: dict = {}
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "kafka"
 
 

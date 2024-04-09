@@ -124,7 +124,7 @@ class _TestSink(SinkBase):
 
 class _TestSinkParams(SinkBaseParams):
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "test"
 
 

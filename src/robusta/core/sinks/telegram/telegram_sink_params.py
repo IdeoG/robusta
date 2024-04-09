@@ -11,7 +11,7 @@ class TelegramSinkParams(SinkBaseParams):
     send_files: bool = True  # Change to False, to omit file attachments
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "telegram"
 
 

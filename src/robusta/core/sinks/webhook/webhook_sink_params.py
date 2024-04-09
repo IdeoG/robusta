@@ -11,7 +11,7 @@ class WebhookSinkParams(SinkBaseParams):
     format: str = "text"
 
     @classmethod
-    def _get_sink_name(cls):
+    def _get_sink_type(cls):
         return "webhook"
 
 
