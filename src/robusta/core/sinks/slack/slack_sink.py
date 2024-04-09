@@ -72,7 +72,7 @@ class SlackSink(SinkBase):
             # Create the first Slack message
             if self.grouping_summary_mode:
                 initial_counts = (1, 0) if status == FindingStatus.FIRING else (0, 1)
-                initial_counts_table = {group_by_classification: initial_counts}
+                initial_counts_table = {summary_classification: initial_counts}
                 self.finding_summary_counts[group_by_classification] = initial_counts_table
                 logging.info("Creating first Slack summarised thread")
                 slack_thread_ts = self.slack_sender.send_summary_message(
@@ -101,17 +101,16 @@ class SlackSink(SinkBase):
                     logging.warning(f"Notification grouping: tried to group on non-existent attribute {attr}")
                     continue
                 values += (finding_data.get(attr),)
-                descriptions.append(f"{attr}={finding_data.get(attr)}")
+                descriptions.append(f"{'reason' if attr=='identifier' else attr}: {finding_data.get(attr)}")
             elif isinstance(attr, dict):
-                if list(attr.keys()) not in [["labels"], ["attributes"]]:
-                    logging.warning(f"Notification grouping: tried to group on non-existent attribute(s) {attr}")
+                # This is typically labels and annotations
                 top_level_attr_name = list(attr.keys())[0]
                 values += tuple(
                     finding_data.get(top_level_attr_name, {}).get(subitem_name)
                     for subitem_name in attr[top_level_attr_name]
                 )
                 descriptions += [
-                    "%s=%s"
+                    "%s: %s"
                     % (
                         f"{top_level_attr_name}:{subitem_name}",
                         finding_data.get(top_level_attr_name, {}).get(subitem_name),

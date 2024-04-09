@@ -45,7 +45,7 @@ class SinkBase(ABC):
                 if sink_params.grouping.notification_mode.summary.by:
                     for attr in sink_params.grouping.notification_mode.summary.by:
                         if isinstance(attr, str):
-                            self.finding_summary_header.append("event_name" if attr == "identifier" else attr)
+                            self.finding_summary_header.append("reason" if attr == "identifier" else attr)
                         elif isinstance(attr, dict):
                             keys = list(attr.keys())
                             if len(keys) > 1:
@@ -54,10 +54,10 @@ class SinkBase(ABC):
                                     "grouping.notification_mode.summary.by"
                                 )
                             key = keys[0]
-                            if key not in ["labels", "attributes"]:
+                            if key not in ["labels", "annotations"]:
                                 raise ValueError(
                                     f"Sink configuration: grouping.notification_mode.summary.by.{key} is invalid "
-                                    "(only labels/attributes allowed)"
+                                    "(only labels/annotations allowed)"
                                 )
                             for label_or_attr_name in attr[key]:
                                 self.finding_summary_header.append(f"{key[:-1]}:{label_or_attr_name}")
