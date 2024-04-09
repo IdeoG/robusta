@@ -1,7 +1,7 @@
 import logging
 import ssl
 import tempfile
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Set, Tuple
 
 import certifi
 from slack_sdk import WebClient
@@ -382,3 +382,31 @@ class SlackSender:
             sink_params.get_slack_channel(self.cluster_name, finding.subject.labels, finding.subject.annotations),
             thread_ts
         )
+
+    def send_summary_message(
+        self,
+        summary_classification_header: List[str],
+        finding_summary_header: List[str],
+        summary_table: Dict[tuple, Tuple[int, int]],
+        sink_params: SlackSinkParams,
+        platform_enabled: bool,
+        msg_ts: str = None  # message identifier (for updates)
+    ):
+        """Create or update a summary message with tabular information about the amount of events
+        firing/resolved and a header describing the event group that this information concerns."""
+        logging.warning(f"XXX send_summary_table {summary_classification_header} {finding_summary_header} {summary_table}")
+
+        # TODO contents
+        try:
+            resp = self.slack_client.chat_postMessage(
+                # TODO: for the purpose of the summary, we pretend labels and annotations are empty. Is this okay?
+                channel=sink_params.get_slack_channel(self.cluster_name, {}, {}),
+                text="A summary message",
+                # blocks=output_blocks,
+                display_as_bot=True,
+            )
+            return resp["ts"]
+        except Exception as e:
+            logging.error(
+                f"error sending message to slack\ne={e}\ntext={message}\nchannel={channel}\nblocks={*output_blocks,}\nattachment_blocks={*attachment_blocks,}"
+            )
