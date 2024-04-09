@@ -159,7 +159,9 @@ class SlackSender:
 
         return self.__to_slack_markdown(block.to_markdown())
 
-    def __to_slack(self, block: BaseBlock, sink_name: str) -> List[SlackBlock]:
+    def __to_slack(self, block: BaseBlock, sink_name: str = None) -> List[SlackBlock]:
+        # sink_name can be omitted if we are sure that neither KubernetesDiffBlock nor
+        # CallbackBlock will be processed.
         if isinstance(block, MarkdownBlock):
             return self.__to_slack_markdown(block)
         elif isinstance(block, DividerBlock):
@@ -182,8 +184,10 @@ class SlackSender:
         elif isinstance(block, ListBlock):
             return self.__to_slack_markdown(block.to_markdown())
         elif isinstance(block, KubernetesDiffBlock):
+            assert sink_name is not None
             return self.__to_slack_diff(block, sink_name)
         elif isinstance(block, CallbackBlock):
+            assert sink_name is not None
             return self.__get_action_block_for_choices(sink_name, block.choices)
         elif isinstance(block, LinksBlock):
             return self.__to_slack_links(block.links)
@@ -394,15 +398,17 @@ class SlackSender:
     ):
         """Create or update a summary message with tabular information about the amount of events
         firing/resolved and a header describing the event group that this information concerns."""
-        logging.warning(f"XXX send_summary_table {summary_classification_header} {finding_summary_header} {summary_table}")
+        logging.warning(f"XXX send_summary_table {summary_classification_header=} {finding_summary_header=} {summary_table=}")
 
-        # TODO contents
+        blocks = [
+            self.__to_slack(MarkdownBlock("👀 Summary for: " + ", ".join(summary_classification_header)),
+        ]
         try:
             resp = self.slack_client.chat_postMessage(
                 # TODO: for the purpose of the summary, we pretend labels and annotations are empty. Is this okay?
                 channel=sink_params.get_slack_channel(self.cluster_name, {}, {}),
-                text="A summary message",
-                # blocks=output_blocks,
+                # text="A summary message",
+                blocks=blocks,
                 display_as_bot=True,
             )
             return resp["ts"]

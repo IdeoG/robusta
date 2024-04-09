@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Optional, Tuple, Dict, List
 
-from robusta.core.reporting.base import Finding
+from robusta.core.reporting.base import Finding, FindingStatus
 from robusta.core.sinks.sink_base import SinkBase
 from robusta.core.sinks.slack.slack_sink_params import SlackSinkConfigWrapper
 from robusta.integrations import slack as slack_module
@@ -22,11 +22,15 @@ class SlackSink(SinkBase):
             self.slack_sender.send_finding_to_slack(finding, self.params, platform_enabled)
 
     def handle_notification_grouping(self, finding: Finding, platform_enabled: bool) -> None:
-        # TODO support firing/resolved
         timestamp = time.time()
         finding_data = finding.attribute_map
         # The following will be e.g. Deployment, Job, etc. Sometimes it's undefined.
         finding_data["workload"] = finding.service.resource_type if finding.service else "-"
+        status: FindingStatus = (
+            FindingStatus.RESOLVED if finding.title.startswith("[RESOLVED]") else FindingStatus.FIRING
+        )
+
+        # 1. Notification accounting
         group_by_classification, _ = self.classify_finding(finding_data, self.params.grouping.group_by)
         with self.finding_group_lock:
             if (
@@ -53,20 +57,23 @@ class SlackSink(SinkBase):
                 finding_data, self.params.grouping.notification_mode.summary.by
             )
 
+        # 2. Notification sending
         if slack_thread_ts is not None:
             # Continue emitting findings in an already existing Slack thread
+            if self.grouping_summary_mode:
+                logging.info(f"Updating summaries in Slack thread {slack_thread_ts}")
+                # TODO update totals in the summary message
             if not self.grouping_summary_mode or self.params.grouping.notification_mode.summary.threaded:
                 logging.info(f"Appending to Slack thread {slack_thread_ts}")
                 self.slack_sender.send_finding_to_slack(
                     finding, self.params, platform_enabled, thread_ts=slack_thread_ts
                 )
-            if self.grouping_summary_mode:
-                logging.info(f"Updating summaries in Slack thread {slack_thread_ts}")
-                # TODO update totals in the summary message
         else:
             # Create the first Slack message
             if self.grouping_summary_mode:
-                self.finding_summary_counts[group_by_classification] = {group_by_classification: (1, 0)}
+                initial_counts = (1, 0) if status == FindingStatus.FIRING else (0, 1)
+                initial_counts_table = {group_by_classification: initial_counts}
+                self.finding_summary_counts[group_by_classification] = initial_counts_table
                 logging.info("Creating first Slack summarised thread")
                 slack_thread_ts = self.slack_sender.send_summary_message(
                     summary_classification_header,
@@ -76,11 +83,14 @@ class SlackSink(SinkBase):
                     platform_enabled,
                 )
                 if self.params.grouping.notification_mode.summary.threaded:
-                    self.slack_sender.send_finding_to_slack(finding, self.params, platform_enabled)
+                    logging.info(f"Appending to Slack thread {slack_thread_ts}")
+                    self.slack_sender.send_finding_to_slack(
+                        finding, self.params, platform_enabled, thread_ts=slack_thread_ts
+                    )
             else:
                 slack_thread_ts = self.slack_sender.send_finding_to_slack(finding, self.params, platform_enabled)
             self.finding_group_heads[group_by_classification] = slack_thread_ts
-            logging.info(f"Created new Slack thread {slack_thread_ts}")
+            logging.info(f"Registered new Slack thread {slack_thread_ts}")
 
     def classify_finding(self, finding_data: Dict, attributes: List) -> Tuple[Tuple[str], List[str]]:
         values = ()
