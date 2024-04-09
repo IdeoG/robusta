@@ -234,6 +234,7 @@ class SlackSender:
         unfurl: bool,
         status: FindingStatus,
         channel: str,
+        thread_ts: str
     ) -> str:
         file_blocks = add_pngs_for_all_svgs([b for b in report_blocks if isinstance(b, FileBlock)])
         if not sink_params.send_svg:
@@ -265,6 +266,7 @@ class SlackSender:
         )
 
         try:
+            kwargs = {"thread_ts": thread_ts} if thread_ts is not None else {}
             resp = self.slack_client.chat_postMessage(
                 channel=channel,
                 text=message,
@@ -275,6 +277,7 @@ class SlackSender:
                 else None,
                 unfurl_links=unfurl,
                 unfurl_media=unfurl,
+                **kwargs
             )
             return resp["ts"]
         except Exception as e:
@@ -329,6 +332,7 @@ class SlackSender:
         finding: Finding,
         sink_params: SlackSinkParams,
         platform_enabled: bool,
+        thread_ts: str = None  # thread identifier
     ) -> str:
         blocks: List[BaseBlock] = []
         attachment_blocks: List[BaseBlock] = []
@@ -376,4 +380,5 @@ class SlackSender:
             unfurl,
             status,
             sink_params.get_slack_channel(self.cluster_name, finding.subject.labels, finding.subject.annotations),
+            thread_ts
         )

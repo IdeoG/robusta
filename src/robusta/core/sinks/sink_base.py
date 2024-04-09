@@ -1,7 +1,6 @@
 import logging
 import threading
 from abc import abstractmethod, ABC
-from datetime import datetime
 from typing import Any, List, Dict, Tuple
 
 from robusta.core.model.k8s_operation_type import K8sOperationType
@@ -11,16 +10,17 @@ from robusta.core.sinks.timing import TimeSlice, TimeSliceAlways
 
 
 class SinkBase(ABC):
+    grouping_enabled: bool
+    grouping_summary_mode: bool
+
     # The tuples in the types below holds all the attributes we are aggregating on.
-    finding_group_start_ts: Dict[Tuple, datetime] = {}
-    finding_group_n_ignored: Dict[Tuple, int] = {}
-    finding_group_heads: Dict[Tuple, str] = {}  # a mapping from a set of parameters to the head of a thread
+    finding_group_start_ts: Dict[Tuple, float]  # timestamps for message groups
+    finding_group_n_ignored: Dict[Tuple, int]  # number of messages ignored for each group
+    finding_group_heads: Dict[Tuple, str]  # a mapping from a set of parameters to the head of a thread
 
     # Summary groups
-    finding_sgroup_header: List = []
-    finding_sgroup_start_ts: Dict[Tuple, datetime] = {}
-    finding_sgroup_counts: Dict[Tuple, int] = {}
-    finding_sgroup_heads: Dict[Tuple. str]
+    finding_sgroup_header: List  # descriptive header for the summary table
+    finding_sgroup_counts: Dict[Tuple, Dict[Tuple, int]]  # rows of the summary table
 
     finding_group_lock: threading.Lock = threading.Lock()
 
@@ -37,29 +37,38 @@ class SinkBase(ABC):
 
         self.time_slices = self._build_time_slices_from_params(self.params.activity)
 
-        # TODO move this out of the ctor, it can be computed on startup
-        self.finding_sgroup_header = []
-        if sink_params.grouping and sink_params.grouping.notification_mode.summary:
-            if sink_params.grouping.notification_mode.summary.by:
-                for attr in sink_params.grouping.notification_mode.summary.by:
-                    if isinstance(attr, str):
-                        self.finding_sgroup_header.append(attr)
-                    elif isinstance(attr, dict):
-                        keys = list(attr.keys())
-                        if len(keys) > 1:
-                            logging.error(
-                                "Invalid sink configuration: multiple values for one of the elements in"
-                                "grouping.notification_mode.summary.by"
-                            )
-                            raise ValueError()
-                        key = keys[0]
-                        if key not in ["labels", "attributes"]:
-                            logging.error(
-                                "Invalid sink configuration: grouping.notification_mode.summary.by.{key} is invalid "
-                                "(only labels/attributes allowed)"
-                            )
-                        for label_or_attr_name in attr[key]:
-                            self.finding_sgroup_header.append(f"{key[:-1]}:{label_or_attr_name}")
+        if sink_params.grouping:
+            self.grouping_enabled = True
+            self.finding_group_start_ts = {}
+            self.finding_group_n_ignored = {}
+            self.finding_group_heads = {}
+            if sink_params.grouping.notification_mode.summary:
+                self.grouping_summary_mode = True
+                self.finding_sgroup_header = []
+                self.finding_sgroup_counts = {}
+                if sink_params.grouping.notification_mode.summary.by:
+                    for attr in sink_params.grouping.notification_mode.summary.by:
+                        if isinstance(attr, str):
+                            self.finding_sgroup_header.append("event" if attr == "identifier" else attr)
+                        elif isinstance(attr, dict):
+                            keys = list(attr.keys())
+                            if len(keys) > 1:
+                                raise ValueError(
+                                    "Invalid sink configuration: multiple values for one of the elements in"
+                                    "grouping.notification_mode.summary.by"
+                                )
+                            key = keys[0]
+                            if key not in ["labels", "attributes"]:
+                                raise ValueError(
+                                    f"Sink configuration: grouping.notification_mode.summary.by.{key} is invalid "
+                                    "(only labels/attributes allowed)"
+                                )
+                            for label_or_attr_name in attr[key]:
+                                self.finding_sgroup_header.append(f"{key[:-1]}:{label_or_attr_name}")
+            else:
+                self.grouping_summary_mode = False
+        else:
+            self.grouping_enabled = False
 
 
     def _build_time_slices_from_params(self, params: ActivityParams):
