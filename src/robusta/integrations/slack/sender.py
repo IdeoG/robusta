@@ -1,6 +1,7 @@
 import logging
 import ssl
 import tempfile
+from itertools import chain
 from typing import Any, Dict, List, Set, Tuple
 
 import certifi
@@ -398,12 +399,13 @@ class SlackSender:
     ):
         """Create or update a summary message with tabular information about the amount of events
         firing/resolved and a header describing the event group that this information concerns."""
-        logging.warning(f"XXX send_summary_table {group_by_classification_header=} {finding_summary_header=} {summary_table=}")
+        # logging.warning(f"XXX send_summary_table {group_by_classification_header=} {finding_summary_header=} {summary_table=}")
 
         rows = []
         for key, value in sorted(summary_table.items()):
-            # key is a tuple of attribute names; value is a 2-tuple with the number of firing and resolved events
-            row = list(str(e) for e in key + value)
+            # key is a tuple of attribute names; value is a 2-element list with
+            # the number of firing and resolved events.
+            row = list(str(e) for e in chain(key, value))
             rows.append(row)
 
         table_block = TableBlock(

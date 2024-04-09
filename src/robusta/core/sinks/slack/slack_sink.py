@@ -25,7 +25,7 @@ class SlackSink(SinkBase):
         timestamp = time.time()
         finding_data = finding.attribute_map
         # The following will be e.g. Deployment, Job, etc. Sometimes it's undefined.
-        finding_data["workload"] = finding.service.resource_type if finding.service else "-"
+        finding_data["workload"] = finding.service.resource_type if finding.service else "<em>unknown</em>"
         status: FindingStatus = (
             FindingStatus.RESOLVED if finding.title.startswith("[RESOLVED]") else FindingStatus.FIRING
         )
@@ -37,7 +37,7 @@ class SlackSink(SinkBase):
         with self.finding_group_lock:
             if (
                 group_by_classification in self.finding_group_start_ts
-                and self.finding_group_start_ts[group_by_classification] - timestamp > self.params.grouping.interval
+                and timestamp - self.finding_group_start_ts[group_by_classification] > self.params.grouping.interval
             ):
                 self.reset_grouping_data()
             if group_by_classification not in self.finding_group_start_ts:
@@ -64,6 +64,10 @@ class SlackSink(SinkBase):
             # Continue emitting findings in an already existing Slack thread
             if self.grouping_summary_mode:
                 logging.info(f"Updating summaries in Slack thread {slack_thread_ts}")
+                with self.finding_group_lock:
+                    idx = 0 if status == FindingStatus.FIRING else 0
+                    self.finding_summary_counts[group_by_classification][summary_classification][idx] += 1
+                    logging.warning(f"SUMMARY_COUNTS: {self.finding_summary_counts}")
                 # TODO update totals in the summary message
             if not self.grouping_summary_mode or self.params.grouping.notification_mode.summary.threaded:
                 logging.info(f"Appending to Slack thread {slack_thread_ts}")
@@ -73,7 +77,7 @@ class SlackSink(SinkBase):
         else:
             # Create the first Slack message
             if self.grouping_summary_mode:
-                initial_counts = (1, 0) if status == FindingStatus.FIRING else (0, 1)
+                initial_counts = [1, 0] if status == FindingStatus.FIRING else [0, 1]
                 initial_counts_table = {summary_classification: initial_counts}
                 self.finding_summary_counts[group_by_classification] = initial_counts_table
                 logging.info("Creating first Slack summarised thread")
@@ -90,6 +94,7 @@ class SlackSink(SinkBase):
                         finding, self.params, platform_enabled, thread_ts=slack_thread_ts
                     )
             else:
+                logging.info("Creating first Slack normal thread")
                 slack_thread_ts = self.slack_sender.send_finding_to_slack(finding, self.params, platform_enabled)
             self.finding_group_heads[group_by_classification] = slack_thread_ts
             logging.info(f"Registered new Slack thread {slack_thread_ts}")
@@ -110,12 +115,11 @@ class SlackSink(SinkBase):
                 top_level_attr_name = list(attr.keys())[0]
                 values += tuple(
                     finding_data.get(top_level_attr_name, {}).get(element_name)
-                    for element_name in sorted(attr[top_level_attr_name].keys())
+                    for element_name in sorted(attr[top_level_attr_name])
                 )
-                descriptions.append(
-                    f"*{top_level_attr_name}*: "
-                    + ", ".join(
-                        f"{label_name}={label_value}" for label_name, label_value in sorted(attr[top_level_attr_name])
-                    )
-                )
+                subvalues = []
+                for subattr_name in sorted(attr[top_level_attr_name]):
+                    subvalues.append((subattr_name, finding_data.get(top_level_attr_name, {}).get(subattr_name)))
+                subvalues_str = ", ".join(f"{key}={value}" for key, value in sorted(subvalues))
+                descriptions.append(f"*{top_level_attr_name}*: {subvalues_str}")
         return values, descriptions
