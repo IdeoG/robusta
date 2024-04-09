@@ -31,7 +31,9 @@ class SlackSink(SinkBase):
         )
 
         # 1. Notification accounting
-        group_by_classification, _ = self.classify_finding(finding_data, self.params.grouping.group_by)
+        group_by_classification, group_by_classification_header = self.classify_finding(
+            finding_data, self.params.grouping.group_by
+        )
         with self.finding_group_lock:
             if (
                 group_by_classification in self.finding_group_start_ts
@@ -76,7 +78,7 @@ class SlackSink(SinkBase):
                 self.finding_summary_counts[group_by_classification] = initial_counts_table
                 logging.info("Creating first Slack summarised thread")
                 slack_thread_ts = self.slack_sender.send_summary_message(
-                    summary_classification_header,
+                    group_by_classification_header,
                     self.finding_summary_header,
                     self.finding_summary_counts[group_by_classification],
                     self.params,
@@ -95,26 +97,25 @@ class SlackSink(SinkBase):
     def classify_finding(self, finding_data: Dict, attributes: List) -> Tuple[Tuple[str], List[str]]:
         values = ()
         descriptions = []
+        # aggregate_descriptions: Dict[str, Dict[str, str]] = {}
         for attr in attributes:
             if isinstance(attr, str):
                 if attr not in finding_data:
                     logging.warning(f"Notification grouping: tried to group on non-existent attribute {attr}")
                     continue
                 values += (finding_data.get(attr),)
-                descriptions.append(f"{'reason' if attr=='identifier' else attr}: {finding_data.get(attr)}")
+                descriptions.append(f"*{'reason' if attr=='identifier' else attr}*: {finding_data.get(attr)}")
             elif isinstance(attr, dict):
                 # This is typically labels and annotations
                 top_level_attr_name = list(attr.keys())[0]
                 values += tuple(
-                    finding_data.get(top_level_attr_name, {}).get(subitem_name)
-                    for subitem_name in attr[top_level_attr_name]
+                    finding_data.get(top_level_attr_name, {}).get(element_name)
+                    for element_name in sorted(attr[top_level_attr_name].keys())
                 )
-                descriptions += [
-                    "%s: %s"
-                    % (
-                        f"{top_level_attr_name}:{subitem_name}",
-                        finding_data.get(top_level_attr_name, {}).get(subitem_name),
+                descriptions.append(
+                    f"*{top_level_attr_name}*: "
+                    + ", ".join(
+                        f"{label_name}={label_value}" for label_name, label_value in sorted(attr[top_level_attr_name])
                     )
-                    for subitem_name in attr[top_level_attr_name]
-                ]
+                )
         return values, descriptions

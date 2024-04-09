@@ -389,7 +389,7 @@ class SlackSender:
 
     def send_summary_message(
         self,
-        summary_classification_header: List[str],
+        group_by_classification_header: List[str],
         finding_summary_header: List[str],
         summary_table: Dict[Tuple[str], Tuple[int, int]],
         sink_params: SlackSinkParams,
@@ -398,7 +398,7 @@ class SlackSender:
     ):
         """Create or update a summary message with tabular information about the amount of events
         firing/resolved and a header describing the event group that this information concerns."""
-        logging.warning(f"XXX send_summary_table {summary_classification_header=} {finding_summary_header=} {summary_table=}")
+        logging.warning(f"XXX send_summary_table {group_by_classification_header=} {finding_summary_header=} {summary_table=}")
 
         rows = []
         for key, value in sorted(summary_table.items()):
@@ -410,14 +410,14 @@ class SlackSender:
             headers=finding_summary_header + ["Firing", "Resolved"],
             rows=rows
         )
-        blocks = self.__to_slack(MarkdownBlock("👀 Summary for: " + ", ".join(summary_classification_header)))
+        blocks = self.__to_slack(MarkdownBlock("👀 Summary for " + ", ".join(group_by_classification_header)))
         blocks.extend(self.__to_slack(table_block))
         try:
             resp = self.slack_client.chat_postMessage(
                 # TODO: for the purpose of the summary, we pretend labels and annotations are empty. Is this okay?
                 # There's some convoluted logic in get_slack_channel that takes this into consideration.
                 channel=sink_params.get_slack_channel(self.cluster_name, {}, {}),
-                text="Summary for: " + ", ".join(summary_classification_header),
+                text="Summary for: " + ", ".join(group_by_classification_header),
                 blocks=blocks,
                 display_as_bot=True,
             )
