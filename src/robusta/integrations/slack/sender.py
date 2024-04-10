@@ -388,11 +388,11 @@ class SlackSender:
             thread_ts
         )
 
-    def send_summary_message(
+    def send_or_update_summary_message(
         self,
         group_by_classification_header: List[str],
         finding_summary_header: List[str],
-        summary_table: Dict[Tuple[str], Tuple[int, int]],
+        summary_table: Dict[Tuple[str], List[int]],
         sink_params: SlackSinkParams,
         platform_enabled: bool,
         msg_ts: str = None  # message identifier (for updates)
@@ -415,16 +415,24 @@ class SlackSender:
         blocks = self.__to_slack(MarkdownBlock("👀 Summary for " + ", ".join(group_by_classification_header)))
         blocks.extend(self.__to_slack(table_block))
         try:
-            resp = self.slack_client.chat_postMessage(
+            if msg_ts is not None:
+                method = self.slack_client.chat_update
+                kwargs = {"ts": msg_ts}
+            else:
+                method = self.slack_client.chat_postMessage
+                kwargs = {}
+            channel = sink_params.get_slack_channel(self.cluster_name, {}, {})
+            resp = method(
                 # TODO: for the purpose of the summary, we pretend labels and annotations are empty. Is this okay?
                 # There's some convoluted logic in get_slack_channel that takes this into consideration.
-                channel=sink_params.get_slack_channel(self.cluster_name, {}, {}),
+                channel=channel,
                 text="Summary for: " + ", ".join(group_by_classification_header),
                 blocks=blocks,
                 display_as_bot=True,
+                **kwargs
             )
             return resp["ts"]
         except Exception as e:
-            logging.error(
-                f"error sending message to slack\ne={e}\ntext={message}\nchannel={channel}\nblocks={*output_blocks,}\nattachment_blocks={*attachment_blocks,}"
+            logging.exception(
+                f"error sending message to slack\n{e}\nchannel={channel}\n"
             )

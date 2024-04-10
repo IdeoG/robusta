@@ -20,9 +20,9 @@ class SinkBase(ABC):
 
     # Summary groups
     finding_summary_header: List[str]  # descriptive header for the summary table
-    finding_summary_counts: Dict[Tuple, Dict[Tuple, Tuple[int, int]]]  # rows of the summary table
+    finding_summary_counts: DefaultDict[Tuple[Tuple, Tuple], List[int]]  # rows of the summary table
 
-    finding_group_lock: threading.Lock = threading.Lock()
+    finding_group_lock: threading.Lock = threading.RLock()
 
     def __init__(self, sink_params: SinkBaseParams, registry):
         self.sink_name = sink_params.name
@@ -68,10 +68,11 @@ class SinkBase(ABC):
         self.reset_grouping_data()
 
     def reset_grouping_data(self):
-        self.finding_group_start_ts = {}
-        self.finding_group_n_received = defaultdict(int)
-        self.finding_group_heads = {}
-        self.finding_summary_counts = {}
+        with self.finding_group_lock:
+            self.finding_group_start_ts = {}
+            self.finding_group_n_received = defaultdict(int)
+            self.finding_group_heads = {}
+            self.finding_summary_counts = defaultdict(lambda: defaultdict(lambda: [0, 0]))
 
     def _build_time_slices_from_params(self, params: ActivityParams):
         if params is None:
