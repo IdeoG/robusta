@@ -23,20 +23,20 @@ class SlackSink(SinkBase):
             self.slack_sender.send_finding_to_slack(finding, self.params, platform_enabled)
 
     def handle_notification_grouping(self, finding: Finding, platform_enabled: bool) -> None:
-        timestamp = time.time()
-        finding_data = finding.attribute_map
-        # The following will be e.g. Deployment, Job, etc. Sometimes it's undefined.
-        finding_data["workload"] = finding.service.resource_type if finding.service else None
-        status: FindingStatus = (
-            FindingStatus.RESOLVED if finding.title.startswith("[RESOLVED]") else FindingStatus.FIRING
-        )
-
-        # 1. Notification accounting
-        group_by_classification, group_by_classification_header = self.classify_finding(
-            finding_data, self.params.grouping.group_by
-        )
-        logging.info(f"*** {group_by_classification=}")
         with self.finding_group_lock:
+            timestamp = time.time()
+            finding_data = finding.attribute_map
+            # The following will be e.g. Deployment, Job, etc. Sometimes it's undefined.
+            finding_data["workload"] = finding.service.resource_type if finding.service else None
+            status: FindingStatus = (
+                FindingStatus.RESOLVED if finding.title.startswith("[RESOLVED]") else FindingStatus.FIRING
+            )
+
+            # 1. Notification accounting
+            group_by_classification, group_by_classification_header = self.classify_finding(
+                finding_data, self.params.grouping.group_by
+            )
+            logging.info(f"*** {group_by_classification=}")
             if (
                 group_by_classification in self.finding_group_start_ts
                 and timestamp - self.finding_group_start_ts[group_by_classification] > self.params.grouping.interval
@@ -56,58 +56,58 @@ class SlackSink(SinkBase):
             ):
                 return
 
-        if self.grouping_summary_mode:
-            summary_classification, summary_classification_header = self.classify_finding(
-                finding_data, self.params.grouping.notification_mode.summary.by
-            )
-            logging.info(f"*** {summary_classification=}")
-            logging.warning(f"(1) SUMMARY_COUNTS: {self.finding_summary_counts}")
+            if self.grouping_summary_mode:
+                summary_classification, summary_classification_header = self.classify_finding(
+                    finding_data, self.params.grouping.notification_mode.summary.by
+                )
+                logging.info(f"*** {summary_classification=}")
+                logging.warning(f"(1) SUMMARY_COUNTS: {self.finding_summary_counts}")
 
-        # 2. Notification sending
-        if slack_thread_ts is not None:
-            # Continue emitting findings in an already existing Slack thread
-            if self.grouping_summary_mode:
-                logging.info(f"Updating summaries in Slack thread {slack_thread_ts}")
-                idx = 0 if status == FindingStatus.FIRING else 0
-                self.finding_summary_counts[group_by_classification][summary_classification][idx] += 1
-                logging.warning(f"(2a) SUMMARY_COUNTS: {self.finding_summary_counts}")
-                # Update the summary message
-                self.slack_sender.send_or_update_summary_message(
-                    group_by_classification_header,
-                    self.finding_summary_header,
-                    self.finding_summary_counts[group_by_classification],
-                    self.params,
-                    platform_enabled,
-                    msg_ts=slack_thread_ts
-                )
-            if not self.grouping_summary_mode or self.params.grouping.notification_mode.summary.threaded:
-                logging.info(f"Appending to Slack thread {slack_thread_ts}")
-                self.slack_sender.send_finding_to_slack(
-                    finding, self.params, platform_enabled, thread_ts=slack_thread_ts
-                )
-        else:
-            # Create the first Slack message
-            if self.grouping_summary_mode:
-                idx = 0 if status == FindingStatus.FIRING else 0
-                self.finding_summary_counts[group_by_classification][summary_classification][idx] += 1
-                logging.warning(f"(2b) SUMMARY_COUNTS: {self.finding_summary_counts}")
-                logging.info("Creating first Slack summarised thread")
-                slack_thread_ts = self.slack_sender.send_or_update_summary_message(
-                    group_by_classification_header,
-                    self.finding_summary_header,
-                    self.finding_summary_counts[group_by_classification],
-                    self.params,
-                    platform_enabled,
-                )
-                if self.params.grouping.notification_mode.summary.threaded:
+            # 2. Notification sending
+            if slack_thread_ts is not None:
+                # Continue emitting findings in an already existing Slack thread
+                if self.grouping_summary_mode:
+                    logging.info(f"Updating summaries in Slack thread {slack_thread_ts}")
+                    idx = 0 if status == FindingStatus.FIRING else 0
+                    self.finding_summary_counts[group_by_classification][summary_classification][idx] += 1
+                    logging.warning(f"(2a) SUMMARY_COUNTS: {self.finding_summary_counts}")
+                    # Update the summary message
+                    self.slack_sender.send_or_update_summary_message(
+                        group_by_classification_header,
+                        self.finding_summary_header,
+                        self.finding_summary_counts[group_by_classification],
+                        self.params,
+                        platform_enabled,
+                        msg_ts=slack_thread_ts
+                    )
+                if not self.grouping_summary_mode or self.params.grouping.notification_mode.summary.threaded:
                     logging.info(f"Appending to Slack thread {slack_thread_ts}")
                     self.slack_sender.send_finding_to_slack(
                         finding, self.params, platform_enabled, thread_ts=slack_thread_ts
                     )
             else:
-                logging.info("Creating first Slack normal thread")
-                slack_thread_ts = self.slack_sender.send_finding_to_slack(finding, self.params, platform_enabled)
-            self.finding_group_heads[group_by_classification] = slack_thread_ts
+                # Create the first Slack message
+                if self.grouping_summary_mode:
+                    idx = 0 if status == FindingStatus.FIRING else 0
+                    self.finding_summary_counts[group_by_classification][summary_classification][idx] += 1
+                    logging.warning(f"(2b) SUMMARY_COUNTS: {self.finding_summary_counts}")
+                    logging.info("Creating first Slack summarised thread")
+                    slack_thread_ts = self.slack_sender.send_or_update_summary_message(
+                        group_by_classification_header,
+                        self.finding_summary_header,
+                        self.finding_summary_counts[group_by_classification],
+                        self.params,
+                        platform_enabled,
+                    )
+                    if self.params.grouping.notification_mode.summary.threaded:
+                        logging.info(f"Appending to Slack thread {slack_thread_ts}")
+                        self.slack_sender.send_finding_to_slack(
+                            finding, self.params, platform_enabled, thread_ts=slack_thread_ts
+                        )
+                else:
+                    logging.info("Creating first Slack normal thread")
+                    slack_thread_ts = self.slack_sender.send_finding_to_slack(finding, self.params, platform_enabled)
+                self.finding_group_heads[group_by_classification] = slack_thread_ts
 
     def classify_finding(self, finding_data: Dict, attributes: List) -> Tuple[Tuple[str], List[str]]:
         values = ()
@@ -119,7 +119,7 @@ class SlackSink(SinkBase):
                     logging.warning(f"Notification grouping: tried to group on non-existent attribute {attr}")
                     continue
                 values += (finding_data.get(attr),)
-                descriptions.append(f"*{'reason' if attr=='identifier' else attr}*: {finding_data.get(attr)}")
+                descriptions.append(f"*{'Notification' if attr=='identifier' else attr}*: {finding_data.get(attr)}")
             elif isinstance(attr, dict):
                 # This is typically labels and annotations
                 top_level_attr_name = list(attr.keys())[0]
